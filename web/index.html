@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Which Way In</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Which Way In">
+<meta name="theme-color" content="#0b6e4f">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 /* Layout: one narrow column — a form strip, then route cards ranked by arrival time, like a departures board */
@@ -19,7 +26,7 @@
   --accent: #4fc79c; --accent-soft: #173229; --warn: #f0b45c; color-scheme: dark } }
 * { box-sizing: border-box }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body) }
-main { max-width: 720px; margin: 0 auto; padding: 28px 16px 60px; display: grid; gap: 22px }
+main { max-width: 720px; margin: 0 auto; padding: calc(28px + env(safe-area-inset-top, 0px)) 16px calc(60px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 22px }
 h1 { font: 800 2rem/1.1 var(--display); margin: 0; letter-spacing: -0.02em; text-wrap: balance }
 .sub { color: var(--muted); margin: 6px 0 0 }
 form { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px }

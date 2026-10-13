@@ -1,0 +1,12 @@
+{
+  "name": "Which Way In",
+  "short_name": "Which Way In",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#11171d",
+  "theme_color": "#0b6e4f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
