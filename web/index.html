@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which Way In</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column — a form strip, then route cards ranked by arrival time, like a departures board */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --fg: #17212b; --muted: #5b6876; --line: #d9dfe5;
+  --accent: #0b6e4f; --accent-soft: #e2f1eb; --warn: #9a5b00;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #11171d; --surface: #1a222a; --fg: #e8edf2; --muted: #9aa7b4; --line: #2c3742;
+  --accent: #4fc79c; --accent-soft: #173229; --warn: #f0b45c; color-scheme: dark } }
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body) }
+main { max-width: 720px; margin: 0 auto; padding: 28px 16px 60px; display: grid; gap: 22px }
+h1 { font: 800 2rem/1.1 var(--display); margin: 0; letter-spacing: -0.02em; text-wrap: balance }
+.sub { color: var(--muted); margin: 6px 0 0 }
+form { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end }
+.field { display: grid; gap: 4px; flex: 1 1 140px; min-width: 0 }
+.field.wide { flex: 3 1 260px }
+.field.when { flex: 0 1 240px }
+.dest { position: relative }
+#sugg { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / .15) }
+#sugg li { padding: 8px 10px; border-radius: 6px; cursor: pointer; display: grid; line-height: 1.3 }
+#sugg li small { color: var(--muted); font-size: .8rem }
+#sugg li[aria-selected="true"], #sugg li:hover { background: var(--accent-soft) }
+label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700 }
+input { min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); width: 100% }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+button { font: 700 1rem var(--body); padding: 11px 20px; border: 0; border-radius: 8px; background: var(--accent); color: var(--surface); cursor: pointer }
+button:disabled { opacity: .6; cursor: wait }
+.recent { display: flex; flex-wrap: wrap; gap: 6px }
+.recent button { background: var(--accent-soft); color: var(--fg); font-weight: 400; font-size: .85rem; padding: 4px 10px; border-radius: 999px }
+.toggle { position: relative; display: inline-flex; flex: none; align-self: end; height: 46px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+.toggle input { position: absolute; opacity: 0; pointer-events: none }
+.toggle label { display: flex; align-items: center; padding: 0 14px; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: .9rem; color: var(--fg) }
+.toggle input:checked + label { background: var(--accent); color: var(--surface) }
+.toggle input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -2px }
+#status { color: var(--muted); min-height: 1.5em; margin: 0 }
+#status.err { color: var(--warn) }
+#results { display: grid; gap: 12px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px }
+.card.best { border: 2px solid var(--accent) }
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline }
+.name { font: 600 1.2rem var(--display); margin: 0 }
+.pill { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: var(--accent); color: var(--surface); padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle }
+.times { display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--mono); font-variant-numeric: tabular-nums }
+.times div { display: grid }
+.times small { font: 700 .7rem var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted) }
+.times b { font-size: 1.35rem; font-weight: 500 }
+.legs { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: .92rem; color: var(--muted) }
+.legs li span { font-family: var(--mono); color: var(--fg); display: inline-block; min-width: 4.5ch }
+.card a { color: var(--accent); font-size: .9rem }
+.card.fail { color: var(--muted) }
+.note { font-size: .85rem; color: var(--muted); margin: 0 }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Which Way In</h1>
+    <p class="sub">From RM14 2LX: public transport from home, or drive to Upminster or Gidea Park and get the train.</p>
+  </header>
+
+  <form id="f">
+    <div class="row">
+      <div class="field wide dest"><label for="dest">Going to</label>
+        <input id="dest" placeholder="Start typing a postcode, station or place" required autocomplete="off"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg">
+        <ul id="sugg" role="listbox" hidden></ul></div>
+    </div>
+    <div class="row">
+      <div class="toggle" role="radiogroup" aria-label="Time means">
+        <input type="radio" name="mode" id="modeLeave" value="leave" checked><label for="modeLeave">Leave at</label>
+        <input type="radio" name="mode" id="modeArrive" value="arrive"><label for="modeArrive">Arrive by</label>
+      </div>
+      <div class="field when"><label for="when" id="whenLabel">Leave at</label><input id="when" type="datetime-local"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="park">Park &amp; walk to platform (min)</label><input id="park" type="number" min="0" value="7"></div>
+      <div class="field"><label for="traffic">Traffic allowance (%)</label><input id="traffic" type="number" min="0" value="20"></div>
+      <button id="go" type="submit">Check times</button>
+    </div>
+    <div class="recent" id="recent"></div>
+  </form>
+
+  <p id="status" role="status"></p>
+  <section id="results"></section>
+  <p class="note">Train and bus times come from the TfL Journey Planner. Drive times come from OpenStreetMap routing, which has no live traffic, so the traffic allowance is added on top. Use the Google Maps links to check live traffic.</p>
+</main>
+
+<script>
+const HOME = { name: "Home", lat: 51.556768, lon: 0.239716, pc: "RM14 2LX" };
+const STATIONS = [
+  { name: "Upminster", id: "1000242", lat: 51.558659, lon: 0.250855 },
+  { name: "Gidea Park", id: "1001115", lat: 51.581904, lon: 0.205964 },
+];
+const TFL = "https://api.tfl.gov.uk/Journey/JourneyResults/";
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const hhmm = d => pad(d.getHours()) + ":" + pad(d.getMinutes());
+const addMin = (d, m) => new Date(d.getTime() + m * 60000);
+const mins = m => m >= 60 ? Math.floor(m / 60) + "h " + pad(Math.round(m % 60)) + "m" : Math.round(m) + " min";
+
+function setNow() {
+  const d = new Date();
+  $("when").value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${hhmm(d)}`;
+}
+
+async function tfl(from, to, depart, arriving = false) {
+  const q = new URLSearchParams({
+    date: `${depart.getFullYear()}${pad(depart.getMonth()+1)}${pad(depart.getDate())}`,
+    time: `${pad(depart.getHours())}${pad(depart.getMinutes())}`,
+    timeIs: arriving ? "Arriving" : "Departing", nationalSearch: "true",
+  });
+  const r = await fetch(TFL + encodeURIComponent(from) + "/to/" + encodeURIComponent(to) + "?" + q);
+  return r.json();
+}
+
+// Turn free text into something TfL accepts, using its disambiguation list
+async function resolveDest(text, depart) {
+  if (chosen && chosen.label === text) return chosen;
+  const pc = text.replace(/\s+/g, "").toUpperCase();
+  if (/^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/.test(pc)) return { param: pc, label: text.toUpperCase() };
+  const d = await tfl(`${HOME.lat},${HOME.lon}`, text, depart);
+  const opts = d.toLocationDisambiguation?.disambiguationOptions;
+  if (opts?.length) {
+    const score = o => o.matchQuality + (o.place.placeType === "StopPoint" ? 0.5 : 0);
+    const best = opts.sort((a, b) => score(b) - score(a))[0];
+    return { param: best.parameterValue, label: best.place.commonName };
+  }
+  if (d.journeys) return { param: text, label: text };
+  throw new Error(`TfL couldn't find "${text}". Try a postcode or a station name.`);
+}
+
+// Leave mode: earliest arrival. Arrive mode: latest departure that still arrives by the target.
+function pick(data, arriveBy) {
+  let js = data.journeys || [];
+  if (arriveBy) {
+    js = js.filter(j => new Date(j.arrivalDateTime) <= arriveBy);
+    return js.sort((a, b) => new Date(b.startDateTime) - new Date(a.startDateTime))[0] || null;
+  }
+  return js.sort((a, b) => new Date(a.arrivalDateTime) - new Date(b.arrivalDateTime))[0] || null;
+}
+
+async function drive(a, b) {
+  const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`);
+  const d = await r.json();
+  if (d.code !== "Ok") throw new Error("Driving route not found");
+  return { min: d.routes[0].duration / 60, km: d.routes[0].distance / 1000 };
+}
+
+const legText = l => {
+  const mode = l.mode.name;
+  const line = l.routeOptions?.[0]?.name;
+  if (mode === "walking") return `Walk to ${l.arrivalPoint.commonName}`;
+  const m = mode.replace("-", " ");
+  const label = !line ? m : line.toLowerCase().includes(m) ? line : `${line} ${m}`;
+  return `${label} to ${l.arrivalPoint.commonName}`;
+};
+const gmaps = (from, to, mode) => `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=${mode}`;
+
+async function check(e) {
+  e?.preventDefault();
+  const text = $("dest").value.trim(); if (!text) return;
+  const t = $("when").value ? new Date($("when").value) : new Date();
+  const arriveBy = $("modeArrive").checked ? t : null;
+  const leave = t;
+  const park = +$("park").value || 0, traffic = 1 + (+$("traffic").value || 0) / 100;
+  $("go").disabled = true; $("results").innerHTML = "";
+  $("status").className = ""; $("status").textContent = "Checking routes…";
+  try {
+    const dest = await resolveDest(text, leave);
+    $("status").textContent = `Routes to ${dest.label}, ${arriveBy ? "arriving by" : "leaving"} ${hhmm(t)}`;
+    saveRecent(dest.param.includes(",") ? { label: text, param: dest.param } : text);
+
+    const options = [];
+    // 1. Public transport from home
+    options.push(tfl(`${HOME.lat},${HOME.lon}`, dest.param, t, !!arriveBy).then(d => {
+      const j = pick(d, arriveBy); if (!j) throw new Error("No public transport journey found");
+      return { name: "From home", sub: "Bus / walk / train", leave: new Date(j.startDateTime), arrive: new Date(j.arrivalDateTime),
+        legs: j.legs.map(l => [l.duration, legText(l)]), destPt: j.legs.at(-1).arrivalPoint,
+        link: gmaps(HOME.pc, dest.label, "transit") };
+    }));
+    // 2 & 3. Drive to station, then train
+    for (const s of STATIONS) {
+      options.push(drive(HOME, s).then(async dr => {
+        const driveMin = Math.ceil(dr.min * traffic);
+        const j = arriveBy
+          ? pick(await tfl(s.id, dest.param, arriveBy, true), arriveBy)
+          : pick(await tfl(s.id, dest.param, addMin(leave, driveMin + park)), null);
+        if (!j) throw new Error("No train journey found");
+        const trainStart = new Date(j.startDateTime);
+        const leaveBy = addMin(trainStart, -(driveMin + park));
+        return { name: `Drive to ${s.name}`, sub: `${dr.km.toFixed(1)} km drive, then train`,
+          leave: !arriveBy && leaveBy < leave ? leave : leaveBy, arrive: new Date(j.arrivalDateTime),
+          legs: [[driveMin, `Drive to ${s.name} station`], [park, "Park and walk to platform"], ...j.legs.map(l => [l.duration, legText(l)])],
+          link: gmaps(HOME.pc, s.name + " station", "driving") };
+      }));
+    }
+    const settled = await Promise.allSettled(options);
+    const names = ["From home", "Drive to Upminster", "Drive to Gidea Park"];
+    const ok = settled.map((r, i) => r.status === "fulfilled" ? r.value : { name: names[i], error: r.reason.message });
+
+    // Bonus: drive all the way, using the destination point TfL gave us
+    const pt = ok.find(o => o.destPt)?.destPt;
+    if (pt) {
+      try {
+        const dr = await drive(HOME, { lat: pt.lat, lon: pt.lon });
+        const m = Math.ceil(dr.min * traffic);
+        ok.push({ name: "Drive all the way", sub: `${dr.km.toFixed(1)} km, parking not included`,
+          leave: arriveBy ? addMin(arriveBy, -m) : leave, arrive: arriveBy || addMin(leave, m),
+          legs: [[m, `Drive to ${dest.label}`]], link: gmaps(HOME.pc, dest.label, "driving"), extra: true });
+      } catch {}
+    }
+    render(ok, arriveBy);
+  } catch (err) {
+    $("status").className = "err"; $("status").textContent = err.message || "Couldn't reach the journey planner. Check your connection and try again.";
+  } finally { $("go").disabled = false; }
+}
+
+function render(list, arriveBy) {
+  // Arrive mode ranks by who can leave latest; leave mode by who gets there first
+  const good = list.filter(o => !o.error).sort((a, b) => (a.extra - b.extra) || (arriveBy ? b.leave - a.leave : a.arrive - b.arrive));
+  const bestTrain = good.find(o => !o.extra);
+  $("results").innerHTML = [...good, ...list.filter(o => o.error)].map(o => {
+    if (o.error) return `<article class="card fail"><p class="name">${o.name}</p><p>${o.error}</p></article>`;
+    const door = (o.arrive - o.leave) / 60000;
+    return `<article class="card ${o === bestTrain ? "best" : ""}">
+      <div class="head"><p class="name">${o.name}${o === bestTrain ? `<span class="pill">${arriveBy ? "Leave latest" : "Fastest"}</span>` : ""}</p><span class="note">${o.sub}</span></div>
+      <div class="times">
+        <div><small>Leave by</small><b>${hhmm(o.leave)}</b></div>
+        <div><small>Arrive</small><b>${hhmm(o.arrive)}</b></div>
+        <div><small>Door to door</small><b>${mins(door)}</b></div>
+      </div>
+      <ul class="legs">${o.legs.map(([m, t]) => `<li><span>${Math.round(m)}′</span> ${t}</li>`).join("")}</ul>
+      <a href="${o.link}" target="_blank" rel="noopener">Open in Google Maps</a>
+    </article>`;
+  }).join("");
+}
+
+function getRecent() { try { return JSON.parse(localStorage.getItem("wwi-recent")) || []; } catch { return []; } }
+const recLabel = x => typeof x === "string" ? x : x.label;
+function saveRecent(t) {
+  const r = [t, ...getRecent().filter(x => recLabel(x).toLowerCase() !== recLabel(t).toLowerCase())].slice(0, 6);
+  try { localStorage.setItem("wwi-recent", JSON.stringify(r)); } catch {}
+  showRecent();
+}
+function showRecent() {
+  const rec = getRecent();
+  $("recent").innerHTML = rec.map(t => `<button type="button">${esc(recLabel(t))}</button>`).join("");
+  $("recent").querySelectorAll("button").forEach((b, i) => b.onclick = () => {
+    const t = rec[i]; chosen = typeof t === "string" ? null : t; $("dest").value = recLabel(t); if (!$("modeArrive").checked) setNow(); check(); });
+}
+
+$("f").addEventListener("submit", e => { closeSugg(); check(e); });
+
+// Address autocomplete: postcodes.io for postcodes, Photon (OpenStreetMap) for places, biased towards home
+let chosen = null, items = [], active = -1, timer, seq = 0;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+async function suggest(q) {
+  const my = ++seq, out = [];
+  const jobs = [fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${HOME.lat}&lon=${HOME.lon}&limit=8&lang=en`)
+    .then(r => r.json()).then(d => d.features.filter(f => f.properties.countrycode === "GB").forEach(f => {
+      const p = f.properties, [lon, lat] = f.geometry.coordinates;
+      const main = p.name || [p.housenumber, p.street].filter(Boolean).join(" ");
+      const sub = [p.name && p.street ? [p.housenumber, p.street].filter(Boolean).join(" ") : "", p.district, p.city || p.county, p.postcode]
+        .filter((v, i, a) => v && a.indexOf(v) === i && v !== main).join(", ");
+      if (main) out.push({ main, sub, label: sub ? `${main}, ${p.postcode || p.city || p.district || ""}`.replace(/, $/, "") : main, param: `${lat},${lon}` });
+    })).catch(() => {})];
+  if (/^[a-z]{1,2}\d/i.test(q)) jobs.unshift(fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(q)}/autocomplete?limit=4`)
+    .then(r => r.json()).then(d => (d.result || []).forEach(pc => out.unshift({ main: pc, sub: "Postcode", label: pc, param: pc.replace(/\s/g, "") }))).catch(() => {}));
+  await Promise.all(jobs);
+  if (my !== seq) return;
+  const seen = new Set();
+  items = out.filter(o => !seen.has(o.main + o.sub) && seen.add(o.main + o.sub)).slice(0, 7);
+  active = -1; drawSugg();
+}
+function drawSugg() {
+  const ul = $("sugg");
+  ul.innerHTML = items.map((o, i) => `<li role="option" id="sg${i}" aria-selected="${i === active}"><span>${esc(o.main)}</span>${o.sub ? `<small>${esc(o.sub)}</small>` : ""}</li>`).join("");
+  ul.hidden = !items.length; $("dest").setAttribute("aria-expanded", String(!!items.length));
+  ul.querySelectorAll("li").forEach((li, i) => li.onmousedown = e => { e.preventDefault(); choose(i); });
+}
+function closeSugg() { items = []; seq++; drawSugg(); }
+function choose(i) { chosen = items[i]; $("dest").value = chosen.label; closeSugg(); }
+$("dest").addEventListener("input", () => {
+  chosen = null; clearTimeout(timer);
+  const q = $("dest").value.trim();
+  if (q.length < 3) return closeSugg();
+  timer = setTimeout(() => suggest(q), 250);
+});
+$("dest").addEventListener("keydown", e => {
+  if (!items.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); active = (active + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length; drawSugg(); }
+  else if (e.key === "Enter" && active >= 0) { e.preventDefault(); choose(active); }
+  else if (e.key === "Escape") closeSugg();
+});
+$("dest").addEventListener("blur", () => setTimeout(closeSugg, 100));
+document.querySelectorAll('[name="mode"]').forEach(x => x.onchange = () => {
+  $("whenLabel").textContent = $("modeArrive").checked ? "Arrive by" : "Leave at";
+});
+setNow(); showRecent();
+const q = new URLSearchParams(location.search).get("to");
+if (q) { $("dest").value = q; check(); }
+</script>
+</body>
+</html>
